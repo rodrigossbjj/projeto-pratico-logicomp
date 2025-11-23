@@ -1,0 +1,113 @@
+Puzzle: puzzle1.txt
+Texto do Puzzle:
+Em uma ilha vivem apenas cavaleiros e patifes. 
+Cavaleiros sempre dizem a verdade, e patifes sempre mentem.
+A diz: 'B é um patife.'
+B diz: 'A e eu somos diferentes.'
+Quem é cavaleiro e quem é patife?. Diretamente resolva o problema: Quem podemos garantir que é cavaleiro e quem é patife?
+Resposta LLM:
+Vamos resolver o problema em duas partes: primeiro, manualmente, e depois usando a biblioteca Z3.
+
+---
+
+### **Resolução Manual**
+
+Vamos definir:
+*   `C`: Cavaleiro (sempre diz a verdade)
+*   `P`: Patife (sempre mente)
+
+As declarações são:
+*   **A diz:** "B é um patife."
+*   **B diz:** "A e eu somos diferentes." (Ou seja, um é cavaleiro e o outro é patife)
+
+Vamos analisar os dois cenários possíveis para A:
+
+**Cenário 1: Suponha que A é um Cavaleiro (C)**
+1.  Se A é um Cavaleiro, A diz a verdade.
+2.  A diz "B é um patife", então, de acordo com A, B *realmente* é um patife.
+3.  Agora temos: A é Cavaleiro e B é Patife.
+4.  Se B é um Patife, B mente.
+5.  B diz "A e eu somos diferentes".
+6.  Considerando que A é Cavaleiro e B é Patife, A e B *são* de fato diferentes. Então, a afirmação de B ("A e eu somos diferentes") é **verdadeira**.
+7.  Mas, se B é um Patife, ele *deve mentir*, o que significa que sua afirmação deveria ser falsa.
+8.  Chegamos a uma contradição: a afirmação de B é verdadeira, mas B deve mentir.
+9.  Portanto, nossa suposição inicial de que A é um Cavaleiro está errada.
+
+**Cenário 2: Suponha que A é um Patife (P)**
+1.  Se A é um Patife, A mente.
+2.  A diz "B é um patife", então, como A mente, B *não* é um patife.
+3.  Se B não é um patife, então B é um Cavaleiro.
+4.  Agora temos: A é Patife e B é Cavaleiro.
+5.  Se B é um Cavaleiro, B diz a verdade.
+6.  B diz "A e eu somos diferentes".
+7.  Considerando que A é Patife e B é Cavaleiro, A e B *são* de fato diferentes. Então, a afirmação de B ("A e eu somos diferentes") é **verdadeira**.
+8.  Isso é consistente com B ser um Cavaleiro (que diz a verdade).
+9.  Não há contradição.
+
+**Conclusão Manual:**
+Podemos garantir que:
+A: patife
+B: cavaleiro
+
+---
+
+### **Resolução com Z3**
+
+Agora, vamos traduzir o problema para Z3.
+
+Definimos variáveis booleanas:
+*   `A_is_knight`: Verdadeiro se A é um cavaleiro, Falso se A é um patife.
+*   `B_is_knight`: Verdadeiro se B é um cavaleiro, Falso se B é um patife.
+
+As condições são:
+
+1.  **Declaração de A:** "B é um patife." (Ou seja, `not B_is_knight`)
+    *   Se A é cavaleiro (`A_is_knight`), então `not B_is_knight` é verdadeiro.
+    *   Se A é patife (`not A_is_knight`), então `not B_is_knight` é falso (ou seja, `B_is_knight` é verdadeiro).
+    *   Isso pode ser formalizado como uma equivalência: `A_is_knight == (not B_is_knight)`
+
+2.  **Declaração de B:** "A e eu somos diferentes." (Ou seja, `A_is_knight != B_is_knight`, que é um XOR)
+    *   Se B é cavaleiro (`B_is_knight`), então `(A_is_knight != B_is_knight)` é verdadeiro.
+    *   Se B é patife (`not B_is_knight`), então `(A_is_knight != B_is_knight)` é falso (ou seja, `A_is_knight == B_is_knight`).
+    *   Isso pode ser formalizado como uma equivalência: `B_is_knight == (A_is_knight != B_is_knight)`
+
+```python
+from z3 import *
+
+# Declarar variáveis booleanas para A e B serem cavaleiros
+A_is_knight = Bool('A_is_knight')
+B_is_knight = Bool('B_is_knight')
+
+s = Solver()
+
+# Restrição 1: Declaração de A
+# A diz "B é um patife" (not B_is_knight)
+# A é cavaleiro SE E SOMENTE SE sua declaração é verdadeira.
+s.add(A_is_knight == Not(B_is_knight))
+
+# Restrição 2: Declaração de B
+# B diz "A e eu somos diferentes" (A_is_knight != B_is_knight)
+# B é cavaleiro SE E SOMENTE SE sua declaração é verdadeira.
+s.add(B_is_knight == (A_is_knight != B_is_knight))
+
+# Verificar se há uma solução
+if s.check() == sat:
+    m = s.model()
+    # Extrair o resultado
+    A_result = "cavaleiro" if m[A_is_knight] else "patife"
+    B_result = "cavaleiro" if m[B_is_knight] else "patife"
+    print(f"A: {A_result}")
+    print(f"B: {B_result}")
+else:
+    print("Nenhuma solução encontrada.")
+
+```
+
+**Executando o código Z3, o resultado será:**
+
+A: patife
+B: cavaleiro
+Resposta Z3:
+{'A': False, 'B': True}
+Correspondência: Não
+========================================
