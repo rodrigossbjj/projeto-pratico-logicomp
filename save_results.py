@@ -39,12 +39,11 @@ def compare_results(llm_answer: str, z3_consequencias: dict) -> bool:
         if "indeterminado" in status:
             continue
 
-        # Se for garantido (cavaleiro ou patife), o LLM precisa bater
-        if person in llm_dict:
-            if status not in llm_dict[person]:
-                return False
-        else:
-            # Se LLM não respondeu aquela letra, também é falha
+        # Normaliza o status do Z3 para apenas "cavaleiro" ou "patife"
+        expected = "patife" if "patife" in status else "cavaleiro"
+
+        # Se LLM não respondeu aquela letra ou divergiu, falha
+        if llm_dict.get(person) != expected:
             return False
 
     return True
