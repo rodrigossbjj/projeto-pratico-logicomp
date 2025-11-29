@@ -60,10 +60,24 @@ def parse_puzzle_to_z3(puzzle_text):
             continue
 
         # Pattern: "X e eu somos iguais"
+        m = re.match(r"([A-Z])\s+e\s+eu\s+somos\s+iguais", statement)
+        if m:
+            ref = m.group(1)
+            restrictions.append(variables[n] == (variables[n] == variables[ref]))
+            continue
+
+        # Pattern: "X e eu somos iguais"
         m = re.match(r"([A-Z])\s+e\s+([A-Z])\s+somos\s+iguais", statement)
         if m:
             ref1, ref2 = m.group(1), m.group(2)
             restrictions.append(variables[ref1] == (variables[ref1] == variables[ref2]))
+            continue
+
+        # Pattern: "X e Y são iguais"
+        m = re.match(r"([A-Z])\s+e\s+([A-Z])\s+são\s+iguais", statement)
+        if m:
+            ref1, ref2 = m.group(1), m.group(2)
+            restrictions.append(variables[n] == (variables[ref1] == variables[ref2]))
             continue
 
         # Pattern: "Eu sou um cavaleiro"
@@ -82,6 +96,13 @@ def parse_puzzle_to_z3(puzzle_text):
             ref1, ref2 = m.group(1), m.group(2)
             # ref1 diz que ref1 e ref2 são diferentes
             restrictions.append(variables[ref1] == (variables[ref1] != variables[ref2]))
+            continue
+
+        # Pattern: "X e Y são diferentes"
+        m = re.match(r"([A-Z])\s+e\s+([A-Z])\s+são\s+diferentes", statement)
+        if m:
+            ref1, ref2 = m.group(1), m.group(2)
+            restrictions.append(variables[n] == (variables[ref1] != variables[ref2]))
             continue
 
     if not restrictions:

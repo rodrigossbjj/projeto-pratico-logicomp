@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import json
 from datetime import datetime
-from solverz3 import parse_puzzle_to_z3, generic_solver, logical_consequences
+from solverz3 import *
 
 
 load_dotenv()
@@ -17,12 +17,12 @@ if not openai_key:
 client = OpenAI(api_key=openai_key)
 
 puzzle_parser = argparse.ArgumentParser(
-    description="Executa o fluxo usando GPT para um puzzle específico."
+    description="Executa a lógica do GPT para um puzzle."
 )
 puzzle_parser.add_argument(
     "-p",
     "--puzzle",
-    help="Nome do arquivo do puzzle ou caminho completo",
+    help="Nome do arquivo do puzzle ou caminho completo!",
 )
 args = puzzle_parser.parse_args()
 
@@ -137,7 +137,7 @@ match = compare_results(llm_answer, str(resultado_z3))
 salva_comparacao(puzzle_name, prompt_base, llm_answer, str(resultado_z3), match)
 
 if match:
-    print("\n✅ O resultado do GPT COINCIDE com o resultado do Z3!")
+    print(f"\n✅ O resultado da IA(GPT) COINCIDE com o resultado do Z3!")
 else:
-    print("\n❌ O GPT ERROU! Veja detalhes salvos em resultados/results_gpt.jsonl")
+    print(f"\n❌ A IA(GPT) ERROU! Veja detalhes salvos em resultados/results.jsonl")
 
