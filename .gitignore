@@ -31,3 +31,7 @@ Thumbs.db
 
 # --- Environment variables ---
 .env
+
+# --- .txt and .jsonl ---
+.txt
+.jsonl
