@@ -83,15 +83,15 @@ with open(caminho_puzzle, "r", encoding="utf-8") as f:
     puzzle = f.read().strip()
 
 resposta = model.generate_content(puzzle + ". Diretamente resolva o problema: Quem podemos garantir (Ou quem é consequência lógica) que é cavaleiro e quem é patife?"
-                                " Responda de forma direta, poucas linhas, exemplo: A: Cavaleiro\n B: Patife\n C: Indeterminado\nNáo é necessário exibir a cadeia de pensamento")
+                                " Responda de forma direta, poucas linhas, exemplo: A: Cavaleiro\n B: Patife\n C: Indeterminado\nNáo é necessário exibir a cadeia de pensamento, sempre em ordem alfabetica")
 print(puzzle)
-print("SEM Z3")
+print("\nSEM Z3")
 print(resposta.text)
 
 resposta_direta = model.generate_content(puzzle + " Agora com ajuda da biblioteca Z3, traduza o problema para Z3 e resolva (Não é necessário envio do código): "
                                         "Quem podemos garantir que é cavaleiro e quem é patife? Responda de forma direta, poucas linhas, apenas informando o que é "
                                         "garantido ou não exemplo: A: Cavaleiro\n B: Patife\n C: Indeterminado\n"
-                                        "Náo é necessário exibir a cadeia de pensamento")
+                                        "Náo é necessário exibir a cadeia de pensamento, sempre em ordem alfabetica")
 
 print("COM Z3")
 print(resposta_direta.text)
@@ -101,18 +101,32 @@ try:
     variables, restrictions = parse_puzzle_to_z3(puzzle)
     resultado_z3 = generic_solver(variables, restrictions)
 
-    print("Resposta correta (Z3 real)\n")
-    if isinstance(resultado_z3, dict):
-        for p, v in resultado_z3.items():
-            print(f"{p}: {'Cavaleiro' if v else 'Patife'}")
-    else:
-        print(resultado_z3)
+    # print("Resposta correta (Z3 real)\n")
+    # if isinstance(resultado_z3, dict):
+    #     for p, v in resultado_z3.items():
+    #         print(f"{p}: {'Cavaleiro' if v else 'Patife'}")
+    # else:
+    #     print(resultado_z3)
 
-    print("\nConsequências Lógicas (O que é garantido)")
+    print("\nZ3: Consequências Lógicas (O que é garantido)")
     consequencias = logical_consequences(variables, restrictions)
+    
+    # ANALYSIS WITHOUT Z3
     match = compare_results(resposta.text, consequencias)
     salva_comparacao(arquivo_escolhido, puzzle, resposta.text, consequencias, match)
     for nome, status in consequencias.items():
         print(f"{nome}: {status}")
+    if match == True:
+        print("\nLLM ACERTOU O PUZZLE SEM Z3")
+    else:
+        print("\nLLM ERROU O PUZZLE SEM Z3")
+    # ANALYSIS WITH Z3
+    match = compare_results(resposta_direta.text, consequencias)
+    salva_comparacao(arquivo_escolhido, puzzle, resposta_direta.text, consequencias, match)
+    if match == True:
+        print("\nLLM ACERTOU O PUZZLE COM Z3")
+    else:
+        print("\nLLM ERROU O PUZZLE COM Z3")
+    
 except Exception as e:
     print(f"Erro ao resolver com Z3: {e}")

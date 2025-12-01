@@ -36,11 +36,16 @@ def compare_results(llm_answer: str, z3_consequencias: dict) -> bool:
         status = status.lower()
 
         # Indeterminado → não pode ser cobrado do LLM
-        if "indeterminado" in status:
-            continue
+        # if "indeterminado" in status:
+        #     continue
 
         # Normaliza o status do Z3 para apenas "cavaleiro" ou "patife"
-        expected = "patife" if "patife" in status else "cavaleiro"
+        if "cavaleiro" in status:
+            expected = "cavaleiro"
+        elif "patife" in status:
+            expected = "patife"
+        else:
+            expected = "indeterminado"
 
         # Se LLM não respondeu aquela letra ou divergiu, falha
         if llm_dict.get(person) != expected:
@@ -50,7 +55,7 @@ def compare_results(llm_answer: str, z3_consequencias: dict) -> bool:
 
 def salva_comparacao(puzzle_name, puzzle_text, llm_answer, z3_consequencias, match):
     os.makedirs("resultados", exist_ok=True)
-
+ 
     short_llm = normalize_answer(llm_answer)
 
     # JSONL curto
