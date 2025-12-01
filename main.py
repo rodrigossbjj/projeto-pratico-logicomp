@@ -83,7 +83,8 @@ with open(caminho_puzzle, "r", encoding="utf-8") as f:
     puzzle = f.read().strip()
 
 resposta = model.generate_content(puzzle + ". Diretamente resolva o problema: Quem podemos garantir (Ou quem é consequência lógica) que é cavaleiro e quem é patife?"
-                                " Responda de forma direta, poucas linhas, exemplo: A: Cavaleiro\n B: Patife\n C: Indeterminado\nNáo é necessário exibir a cadeia de pensamento, sempre em ordem alfabetica")
+                                " Responda de forma direta, poucas linhas, exemplo: A: Cavaleiro\n B: Patife\n C: Indeterminado\nNáo é necessário exibir a cadeia de pensamento, sempre em ordem alfabetica,"
+                                " para problemas impossíveis, retorne: Inconsistente para todas as pessoas")
 print(puzzle)
 print("\nSEM Z3")
 print(resposta.text)
@@ -91,22 +92,15 @@ print(resposta.text)
 resposta_direta = model.generate_content(puzzle + " Agora com ajuda da biblioteca Z3, traduza o problema para Z3 e resolva (Não é necessário envio do código): "
                                         "Quem podemos garantir que é cavaleiro e quem é patife? Responda de forma direta, poucas linhas, apenas informando o que é "
                                         "garantido ou não exemplo: A: Cavaleiro\n B: Patife\n C: Indeterminado\n"
-                                        "Náo é necessário exibir a cadeia de pensamento, sempre em ordem alfabetica")
+                                        "Náo é necessário exibir a cadeia de pensamento, sempre em ordem alfabetica, para problemas impossíveis, retorne: Inconsistente para todas as pessoas")
 
-print("COM Z3")
+print("\nCOM Z3")
 print(resposta_direta.text)
 
 # Z3 with correct answer
 try:
     variables, restrictions = parse_puzzle_to_z3(puzzle)
     resultado_z3 = generic_solver(variables, restrictions)
-
-    # print("Resposta correta (Z3 real)\n")
-    # if isinstance(resultado_z3, dict):
-    #     for p, v in resultado_z3.items():
-    #         print(f"{p}: {'Cavaleiro' if v else 'Patife'}")
-    # else:
-    #     print(resultado_z3)
 
     print("\nZ3: Consequências Lógicas (O que é garantido)")
     consequencias = logical_consequences(variables, restrictions)
