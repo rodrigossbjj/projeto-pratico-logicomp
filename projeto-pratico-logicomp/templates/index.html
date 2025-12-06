@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Solver — Step-by-step</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Solver — Step-by-step</h1>
+
+    <div class="controls">
+      <label class="meta">Solver:</label>
+      <select id="solverSelect">
+        <option value="main" selected>main.py</option>
+        <option value="main_gpt">main_gpt.py</option>
+      </select>
+
+      <label class="meta">Args / Puzzle:</label>
+      <input id="args" placeholder="-p puzzle1 or puzzle1" style="min-width:260px;">
+
+      <button id="runBtn">Run</button>
+      <button id="stopBtn" disabled>Stop</button>
+    </div>
+
+    <div>
+      <div class="tag">Live log</div>
+      <pre id="log" class="log"></pre>
+    </div>
+  </div>
+
+<script>
+let es = null;
+
+function appendLog(text, cls) {
+  const log = document.getElementById("log");
+  const safe = (text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  
+  // Append raw text exactly as coming from terminal
+  log.innerHTML += safe + "\n";
+
+  // Auto scroll
+  log.scrollTop = log.scrollHeight;
+}
+
+
+document.getElementById("runBtn").addEventListener("click", () => {
+  if (es) return;
+  const solver = document.getElementById("solverSelect").value;
+  const args = document.getElementById("args").value || "";
+  const url = `/stream?module=${encodeURIComponent(solver)}&args=${encodeURIComponent(args)}`;
+
+  document.getElementById("runBtn").disabled = true;
+  document.getElementById("stopBtn").disabled = false;
+  document.getElementById("log").textContent = "";
+
+  es = new EventSource(url);
+
+  es.onmessage = function(event) {
+    appendLog(event.data);
+  };
+
+  es.addEventListener("done", function(e) {
+    appendLog("=== DONE ===", "done");
+    if (es) {
+      es.close();
+      es = null;
+    }
+    document.getElementById("runBtn").disabled = false;
+    document.getElementById("stopBtn").disabled = true;
+  });
+
+  es.onerror = function(e) {
+    appendLog("Connection closed or error. Check server console.", "error");
+    if (es) {
+      es.close();
+      es = null;
+    }
+    document.getElementById("runBtn").disabled = false;
+    document.getElementById("stopBtn").disabled = true;
+  };
+});
+
+document.getElementById("stopBtn").addEventListener("click", () => {
+  if (es) {
+    es.close();
+    es = null;
+    appendLog("=== STOPPED BY USER ===", "error");
+  }
+  document.getElementById("runBtn").disabled = false;
+  document.getElementById("stopBtn").disabled = true;
+});
+</script>
+</body>
+</html>
