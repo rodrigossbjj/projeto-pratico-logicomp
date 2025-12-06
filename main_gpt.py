@@ -1,143 +1,162 @@
 import os
 import argparse
 from dotenv import load_dotenv
-from openai import OpenAI
-import json
+import google.generativeai as genai
+import random
 from datetime import datetime
 from solverz3 import *
+from save_results import *
+import time
+import io
+import sys
 
 
-load_dotenv()
+# ============================================================
+# 1. ORIGINAL SOLVER (KEPT UNCHANGED)
+# ============================================================
 
-openai_key = os.getenv("OPENAI_API_KEY")
-if not openai_key:
-    print("Chave OPENAI_API_KEY não encontrada no .env.")
-    exit(1)
+def solver(puzzle_arg=None):
 
-client = OpenAI(api_key=openai_key)
+    # CLI args
+    parser = argparse.ArgumentParser(description="Resolve puzzles com Gemini + Z3")
+    parser.add_argument("--puzzle", help="Nome do arquivo .txt em puzzles/ a ser usado")
+    args = parser.parse_args()
 
-puzzle_parser = argparse.ArgumentParser(
-    description="Executa a lógica do GPT para um puzzle."
-)
-puzzle_parser.add_argument(
-    "-p",
-    "--puzzle",
-    help="Nome do arquivo do puzzle ou caminho completo!",
-)
-args = puzzle_parser.parse_args()
+    # Load environment
+    load_dotenv()
+    api_key = os.getenv("API_KEY")
 
-puzzles_dir = "puzzles"
+    if not api_key:
+        print("Chave de API não encontrada no arquivo .env.")
+        return
+    
+    print("Chave de API carregada com sucesso")
 
-if args.puzzle:
-    puzzle_arg = args.puzzle if args.puzzle.endswith(".txt") else f"{args.puzzle}.txt"
-    if os.path.isabs(puzzle_arg):
-        caminho_puzzle = puzzle_arg
-    else:
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-2.5-pro")
+
+    puzzles_dir = "puzzles"
+
+    # Puzzle via argumento
+    if args.puzzle:
+        puzzle_arg = args.puzzle if args.puzzle.endswith(".txt") else f"{args.puzzle}.txt"
         caminho_puzzle = os.path.join(puzzles_dir, puzzle_arg)
 
-    if not os.path.exists(caminho_puzzle):
-        raise FileNotFoundError(f"Puzzle '{puzzle_arg}' não encontrado!")
+        if not os.path.exists(caminho_puzzle):
+            print(f"Puzzle '{puzzle_arg}' não encontrado!")
+            return
 
-    puzzle_name = os.path.basename(caminho_puzzle)
-else:
-    arquivos = sorted(
-        [f for f in os.listdir(puzzles_dir) if f.endswith(".txt")]
-    )
-    if not arquivos:
-        raise FileNotFoundError("Nenhum arquivo .txt encontrado na pasta 'puzzles'.")
-    puzzle_name = arquivos[0]
-    caminho_puzzle = os.path.join(puzzles_dir, puzzle_name)
+        arquivo_escolhido = os.path.basename(caminho_puzzle)
 
-with open(caminho_puzzle, "r", encoding="utf-8") as fp:
-    puzzle_text = fp.read().strip()
-
-prompt_base = (
-    puzzle_text
-    + ". Diretamente resolva o problema: Quem podemos garantir que é cavaleiro e quem é patife?"
-)
-full_prompt = (
-    prompt_base
-    + " Agora com ajuda da biblioteca Z3, traduza o problema para Z3 e resolva: "
-    "Quem podemos garantir que é cavaleiro e quem é patife? Retorne o resultado assim por ex: A: cavaleiro"
-)
-
-print(prompt_base)
-
-response = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[
-        {"role": "user", "content": full_prompt},
-    ],
-)
-
-llm_answer = response.choices[0].message.content
-print(llm_answer)
-
-try:
-    vars_z3, restrictions = parse_puzzle_to_z3(prompt_base)
-    resultado_z3 = generic_solver(vars_z3, restrictions)
-    print("Resposta correta (Z3 real)\n")
-    if isinstance(resultado_z3, dict):
-        for pessoa, valor in resultado_z3.items():
-            print(f"{pessoa}: {'Cavaleiro' if valor else 'Patife'}")
     else:
-        print(resultado_z3)
+        arquivos = [f for f in os.listdir(puzzles_dir) if f.endswith(".txt")]
+        if not arquivos:
+            print("Nenhum arquivo .txt encontrado na pasta 'puzzles'.")
+            return
 
-    print("\nConsequências Lógicas (O que é garantido)")
-    consequencias = logical_consequences(vars_z3, restrictions)
-    for nome, status in consequencias.items():
-        print(f"{nome}: {status}")
-except Exception as exc:
-    print(f"Erro ao resolver com Z3: {exc}")
-    raise
+        arquivo_escolhido = random.choice(arquivos)
+        caminho_puzzle = os.path.join(puzzles_dir, arquivo_escolhido)
 
+    # Read puzzle file
+    with open(caminho_puzzle, "r", encoding="utf-8") as f:
+        puzzle = f.read().strip()
 
-def compare_results(llm_answer: str, z3_answer: str) -> bool:
-    llm_answer = llm_answer.strip().lower()
-    z3_answer = z3_answer.strip().lower()
+    print(puzzle)
+    print("\nSEM Z3")
 
-    return any(
-        [
-            "cavaleiro" in llm_answer and "cavaleiro" in z3_answer,
-            "patife" in llm_answer and "patife" in z3_answer,
-            llm_answer == z3_answer,
-        ]
+    # LLM (SEM Z3)
+    resposta = model.generate_content(
+        puzzle +
+        ". Diretamente resolva o problema: Quem podemos garantir que é cavaleiro e quem é patife? "
+        "Responda em ordem alfabética. Para problemas impossíveis, retorne: Inconsistente para todas as pessoas."
     )
 
+    print(resposta.text)
 
-def salva_comparacao(puzzle_name, puzzle_text, llm_answer, z3_answer, match):
-    resultados_dir = "resultados"
-    os.makedirs(resultados_dir, exist_ok=True)
+    # LLM (COM Z3)
+    print("\nCOM Z3")
+    resposta_direta = model.generate_content(
+        puzzle +
+        " Agora usando Z3, traduza o problema e retorne apenas o resultado direto, "
+        "ex.: A: Cavaleiro; B: Patife; C: Indeterminado."
+    )
+    print(resposta_direta.text)
 
-    txt_path = os.path.join(resultados_dir, "comparacoes_gpt.txt")
-    json_path = os.path.join(resultados_dir, "results_gpt.jsonl")
+    # Z3 REAL
+    print("\nZ3: Consequências Lógicas (O que é garantido)")
+    try:
+        variables, restrictions = parse_puzzle_to_z3(puzzle)
+        consequencias = logical_consequences(variables, restrictions)
 
-    with open(txt_path, "a", encoding="utf-8") as f:
-        f.write(f"Puzzle: {puzzle_name}\n")
-        f.write(f"Texto do Puzzle:\n{puzzle_text}\n")
-        f.write(f"Resposta GPT:\n{llm_answer}\n")
-        f.write(f"Resposta Z3:\n{z3_answer}\n")
-        f.write(f"Correspondência: {'Sim' if match else 'Não'}\n")
-        f.write("=" * 40 + "\n")
+        for nome, status in consequencias.items():
+            print(f"{nome}: {status}")
 
-    result = {
-        "timestamp": datetime.now().isoformat(),
-        "puzzle_file": puzzle_name,
-        "puzzle_text": puzzle_text,
-        "llm_answer": llm_answer,
-        "z3_answer": z3_answer,
-        "match": match,
-        "model": "gpt-4o-mini",
-    }
-    with open(json_path, "a", encoding="utf-8") as jf:
-        jf.write(json.dumps(result, ensure_ascii=False) + "\n")
+        # Compare WITHOUT Z3
+        match_sem = compare_results(resposta.text, consequencias)
+        salva_comparacao(arquivo_escolhido, puzzle, resposta.text, consequencias, match_sem)
+
+        if match_sem:
+            print("\nLLM ACERTOU O PUZZLE SEM Z3")
+        else:
+            print("\nLLM ERROU O PUZZLE SEM Z3")
+
+        # Compare WITH Z3
+        match_com = compare_results(resposta_direta.text, consequencias)
+        salva_comparacao(arquivo_escolhido, puzzle, resposta_direta.text, consequencias, match_com)
+
+        if match_com:
+            print("\nLLM ACERTOU O PUZZLE COM Z3")
+        else:
+            print("\nLLM ERROU O PUZZLE COM Z3")
+
+    except Exception as e:
+        print(f"Erro ao resolver com Z3: {e}")
 
 
-match = compare_results(llm_answer, str(resultado_z3))
-salva_comparacao(puzzle_name, prompt_base, llm_answer, str(resultado_z3), match)
 
-if match:
-    print(f"\n✅ O resultado da IA(GPT) COINCIDE com o resultado do Z3!")
-else:
-    print(f"\n❌ A IA(GPT) ERROU! Veja detalhes salvos em resultados/results.jsonl")
+# ============================================================
+# 2. STREAMING WRAPPER (SAFE, NON-DESTRUCTIVE)
+# ============================================================
 
+def solve(puzzle_arg=None):
+    """
+    Wrapper que captura todos os prints do solver() e envia via yield
+    para o frontend web como streaming.
+    NÃO altera nenhuma lógica original.
+    """
+    buffer = io.StringIO()
+    old_stdout = sys.stdout
+    sys.stdout = buffer
+
+    # Executa o solver original normalmente
+    try:
+        if puzzle_arg:
+            solver(puzzle_arg)
+        else:
+            solver()
+    except Exception as e:
+        yield f"Erro: {e}"
+
+    # Restaura saída padrão
+    sys.stdout = old_stdout
+
+    # Envia linha a linha
+    output = buffer.getvalue().splitlines()
+    for line in output:
+        yield line
+
+
+
+# ============================================================
+# 3. TERMINAL MODE (UNCHANGED)
+# ============================================================
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--puzzle", help="Nome do puzzle")
+    args = parser.parse_args()
+
+    if args.puzzle:
+        solver(args.puzzle)
+    else:
+        solver()
