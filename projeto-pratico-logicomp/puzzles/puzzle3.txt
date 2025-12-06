@@ -1,6 +1,0 @@
-Em uma ilha vivem apenas cavaleiros e patifes.
-Cavaleiros sempre dizem a verdade, e patifes sempre mentem.
-A diz: 'B e eu somos diferentes.'
-B diz: 'A é um patife.'
-C diz: 'A é um patife.'
-Quem é cavaleiro e quem é patife?
