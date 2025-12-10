@@ -1,0 +1,24 @@
+puzzle1.txt | MATCH: False
+LLM: {'A': 'cavaleiro', 'B': 'patife'}
+Z3:  {'A': 'Patife (necessariamente falso)', 'B': 'Cavaleiro (necessariamente verdadeiro)'}
+------------------------------
+puzzle2.txt | MATCH: False
+LLM: {'A': 'cavaleiro', 'B': 'patife', 'C': 'cavaleiro'}
+Z3:  {'A': 'Indeterminado (pode ser ambos)', 'B': 'Indeterminado (pode ser ambos)', 'C': 'Cavaleiro (necessariamente verdadeiro)'}
+------------------------------
+puzzle3.txt | MATCH: True
+LLM: {'A': 'cavaleiro', 'B': 'patife', 'C': 'patife'}
+Z3:  {'A': 'Cavaleiro (necessariamente verdadeiro)', 'B': 'Patife (necessariamente falso)', 'C': 'Patife (necessariamente falso)'}
+------------------------------
+puzzle4.txt | MATCH: False
+LLM: {'A': 'cavaleiro', 'B': 'patife', 'C': 'cavaleiro'}
+Z3:  {'A': 'Inconsistente (sem modelo possível)', 'B': 'Inconsistente (sem modelo possível)', 'C': 'Inconsistente (sem modelo possível)'}
+------------------------------
+puzzle5.txt | MATCH: False
+LLM: {'A': 'patife', 'B': 'patife', 'C': 'cavaleiro'}
+Z3:  {'A': 'Patife (necessariamente falso)', 'B': 'Indeterminado (pode ser ambos)', 'C': 'Cavaleiro (necessariamente verdadeiro)'}
+------------------------------
+puzzle5.txt | MATCH: False
+LLM: {'A': 'patife', 'B': 'patife', 'C': 'cavaleiro'}
+Z3:  {'A': 'Patife (necessariamente falso)', 'B': 'Indeterminado (pode ser ambos)', 'C': 'Cavaleiro (necessariamente verdadeiro)'}
+------------------------------

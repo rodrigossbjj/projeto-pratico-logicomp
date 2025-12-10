@@ -130,7 +130,7 @@ def solver(puzzle_arg=None):
         for nome, status in consequencias.items():
             print(f"{nome}: {status}")
 
-        # Compare without Z3
+        # Compare without Z3 (registro principal)
         match = compare_results(resposta.text, consequencias)
         salva_comparacao(arquivo_escolhido, puzzle, resposta.text, consequencias, match)
 
@@ -139,10 +139,8 @@ def solver(puzzle_arg=None):
         else:
             print("\nLLM ERROU O PUZZLE SEM Z3")
 
-        # Compare with Z3
+        # Compare with Z3 (apenas exibição, não salva em results.jsonl para evitar duplicatas)
         match = compare_results(resposta_direta.text, consequencias)
-        salva_comparacao(arquivo_escolhido, puzzle, resposta_direta.text, consequencias, match)
-
         if match:
             print("\nLLM ACERTOU O PUZZLE COM Z3")
         else:

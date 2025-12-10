@@ -1,7 +1,7 @@
 import os
 import argparse
 from dotenv import load_dotenv
-import google.generativeai as genai
+from openai import OpenAI
 import random
 from datetime import datetime
 from solverz3 import *
@@ -16,94 +16,129 @@ import sys
 # ============================================================
 
 def solver(puzzle_arg=None):
-
-    # CLI args
-    parser = argparse.ArgumentParser(description="Resolve puzzles com Gemini + Z3")
-    parser.add_argument("--puzzle", help="Nome do arquivo .txt em puzzles/ a ser usado")
+    # CLI args em linha com main.py
+    parser = argparse.ArgumentParser(description="Resolve puzzles de cavaleiros e patifes")
+    parser.add_argument("--puzzle", "-p", help="Nome do arquivo .txt em puzzles/ a ser usado (ex: puzzle1.txt)")
     args = parser.parse_args()
 
     # Load environment
     load_dotenv()
-    api_key = os.getenv("API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
 
-    if not api_key:
-        print("Chave de API não encontrada no arquivo .env.")
+    if api_key:
+        print("Chave de API carregada com sucesso (OpenAI)")
+    else:
+        print("OPENAI_API_KEY não encontrada no arquivo .env.")
         return
-    
-    print("Chave de API carregada com sucesso")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-pro")
+    client = OpenAI(api_key=api_key)
+    model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
     puzzles_dir = "puzzles"
 
-    # Puzzle via argumento
+    # Puzzle via argumento (aceita com/sem .txt e caminho absoluto)
     if args.puzzle:
         puzzle_arg = args.puzzle if args.puzzle.endswith(".txt") else f"{args.puzzle}.txt"
-        caminho_puzzle = os.path.join(puzzles_dir, puzzle_arg)
+
+        if os.path.isabs(puzzle_arg):
+            caminho_puzzle = puzzle_arg
+        else:
+            caminho_puzzle = os.path.join(puzzles_dir, puzzle_arg)
 
         if not os.path.exists(caminho_puzzle):
             print(f"Puzzle '{puzzle_arg}' não encontrado!")
             return
 
         arquivo_escolhido = os.path.basename(caminho_puzzle)
-
     else:
-        arquivos = [f for f in os.listdir(puzzles_dir) if f.endswith(".txt")]
+        arquivos = sorted([f for f in os.listdir(puzzles_dir) if f.endswith(".txt")])
         if not arquivos:
             print("Nenhum arquivo .txt encontrado na pasta 'puzzles'.")
             return
-
-        arquivo_escolhido = random.choice(arquivos)
+        arquivo_escolhido = arquivos[0]
         caminho_puzzle = os.path.join(puzzles_dir, arquivo_escolhido)
+
+    # Lista arquivos para fallback aleatório (mantém compatibilidade com main.py)
+    arquivos = [f for f in os.listdir(puzzles_dir) if f.endswith(".txt")]
+    if not arquivos:
+        print("Nenhum arquivo .txt encontrado na pasta 'puzzles'.")
+        return
+
+    if args.puzzle:
+        puzzle_nome = args.puzzle if args.puzzle.endswith(".txt") else f"{args.puzzle}.txt"
+        if puzzle_nome not in arquivos and not os.path.isabs(puzzle_nome):
+            print(f"Arquivo {args.puzzle} não encontrado na pasta 'puzzles'.")
+            return
+        arquivo_escolhido = puzzle_nome
+    else:
+        arquivo_escolhido = random.choice(arquivos)
+    caminho_puzzle = caminho_puzzle if args.puzzle and os.path.isabs(puzzle_arg) else os.path.join(puzzles_dir, arquivo_escolhido)
 
     # Read puzzle file
     with open(caminho_puzzle, "r", encoding="utf-8") as f:
         puzzle = f.read().strip()
 
+    def ask_gpt(prompt: str) -> str:
+        """Dispara um chat.completions.create e devolve apenas o texto da primeira escolha."""
+        resp = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+        )
+        return resp.choices[0].message.content
+
+    # ======= LLM (SEM Z3) =======
+    resposta = ask_gpt(
+        puzzle + ". Diretamente resolva o problema: Quem podemos garantir (Ou quem é consequência lógica) que é cavaleiro e quem é patife?"
+        " Responda de forma direta, poucas linhas, exemplo: A: Cavaleiro\n B: Patife\n C: Indeterminado\nNão é necessário exibir a cadeia de pensamento, sempre em ordem alfabética,"
+        " para problemas impossíveis, retorne: Inconsistente para todas as pessoas"
+    )
+
     print(puzzle)
     print("\nSEM Z3")
+    print(resposta)
 
-    # LLM (SEM Z3)
-    resposta = model.generate_content(
-        puzzle +
-        ". Diretamente resolva o problema: Quem podemos garantir que é cavaleiro e quem é patife? "
-        "Responda em ordem alfabética. Para problemas impossíveis, retorne: Inconsistente para todas as pessoas."
+    # ======= LLM (COM Z3) =======
+    resposta_direta = ask_gpt(
+        puzzle + " Agora com ajuda da biblioteca Z3, traduza o problema para Z3 e resolva (Não é necessário envio do código): "
+        "Quem podemos garantir que é cavaleiro e quem é patife? Responda de forma direta, poucas linhas, apenas informando o que é "
+        "garantido ou não exemplo: A: Cavaleiro\n B: Patife\n C: Indeterminado\n"
+        "Não é necessário exibir a cadeia de pensamento, sempre em ordem alfabética, para problemas impossíveis, retorne: Inconsistente para todas as pessoas"
     )
 
-    print(resposta.text)
-
-    # LLM (COM Z3)
     print("\nCOM Z3")
-    resposta_direta = model.generate_content(
-        puzzle +
-        " Agora usando Z3, traduza o problema e retorne apenas o resultado direto, "
-        "ex.: A: Cavaleiro; B: Patife; C: Indeterminado."
-    )
-    print(resposta_direta.text)
+    print(resposta_direta)
 
-    # Z3 REAL
-    print("\nZ3: Consequências Lógicas (O que é garantido)")
+    # ======= Z3 (REAL) =======
     try:
         variables, restrictions = parse_puzzle_to_z3(puzzle)
+        resultado_z3 = generic_solver(variables, restrictions)
+
+        print("\nZ3: Consequências Lógicas (O que é garantido)")
         consequencias = logical_consequences(variables, restrictions)
 
         for nome, status in consequencias.items():
             print(f"{nome}: {status}")
 
-        # Compare WITHOUT Z3
-        match_sem = compare_results(resposta.text, consequencias)
-        salva_comparacao(arquivo_escolhido, puzzle, resposta.text, consequencias, match_sem)
+        # Compare WITHOUT Z3 (registro principal)
+        match_sem = compare_results(resposta, consequencias)
+        salva_comparacao(
+            arquivo_escolhido,
+            puzzle,
+            resposta,
+            consequencias,
+            match_sem,
+            results_path="resultados/results_gpt.jsonl",
+            comparacoes_path="resultados/comparacoes_gpt.txt",
+        )
 
         if match_sem:
             print("\nLLM ACERTOU O PUZZLE SEM Z3")
         else:
             print("\nLLM ERROU O PUZZLE SEM Z3")
 
-        # Compare WITH Z3
-        match_com = compare_results(resposta_direta.text, consequencias)
-        salva_comparacao(arquivo_escolhido, puzzle, resposta_direta.text, consequencias, match_com)
-
+        # Compare WITH Z3 (apenas exibição; não salva em results_gpt.jsonl para evitar duplicatas)
+        match_com = compare_results(resposta_direta, consequencias)
         if match_com:
             print("\nLLM ACERTOU O PUZZLE COM Z3")
         else:

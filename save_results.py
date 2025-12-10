@@ -53,13 +53,17 @@ def compare_results(llm_answer: str, z3_consequencias: dict) -> bool:
 
     return True
 
-def salva_comparacao(puzzle_name, puzzle_text, llm_answer, z3_consequencias, match):
-    os.makedirs("resultados", exist_ok=True)
+def salva_comparacao(puzzle_name, puzzle_text, llm_answer, z3_consequencias, match,
+                     results_path="resultados/results.jsonl",
+                     comparacoes_path="resultados/comparacoes.txt"):
+    for path in {results_path, comparacoes_path}:
+        dir_path = os.path.dirname(path) or "."
+        os.makedirs(dir_path, exist_ok=True)
  
     short_llm = normalize_answer(llm_answer)
 
     # JSONL curto
-    with open("resultados/results.jsonl", "a", encoding="utf-8") as jf:
+    with open(results_path, "a", encoding="utf-8") as jf:
         jf.write(json.dumps({
             "puzzle": puzzle_name,
             "llm": short_llm,
@@ -68,7 +72,7 @@ def salva_comparacao(puzzle_name, puzzle_text, llm_answer, z3_consequencias, mat
         }, ensure_ascii=False) + "\n")
 
     # TXT curto
-    with open("resultados/comparacoes.txt", "a", encoding="utf-8") as f:
+    with open(comparacoes_path, "a", encoding="utf-8") as f:
         f.write(f"{puzzle_name} | MATCH: {match}\n")
         f.write(f"LLM: {short_llm}\n")
         f.write(f"Z3:  {z3_consequencias}\n")
