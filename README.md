@@ -1,6 +1,5 @@
 # Knights and Knaves com LLM e Z3
 <h4 align="center"> 
-	:construction:  Projeto em construção  :construction:
 </h4>
 Projeto em desenvolvimento para a cadeira de Lógica para Computação do curso de Ciências da Computação. Este projeto tem como objetivo:
 avaliar LLM com puzzles Knights and Knaves Genéricos (n pessoas que falam umas das outras e pedir para resolver com valores especificos de n).
